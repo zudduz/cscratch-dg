@@ -1,0 +1,35 @@
+steps:
+  # 1. Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA', '.']
+
+  # 2. Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA']
+
+  # 3. Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - '$_SERVICE_NAME'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA'
+      - '--region'
+      - '$_REGION'
+      - '--allow-unauthenticated'
+      - '--min-instances=0'
+      - '--max-instances=1'
+      - '--set-env-vars'
+      - 'ENGINE_URL=$_ENGINE_URL,GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
+      - '--set-secrets'
+      - 'INTERNAL_API_KEY=cscratch-internal-api-key:latest,DISCORD_TOKEN=cscratch-discord-token:latest'
+
+substitutions:
+    _SERVICE_NAME: cscratch-dg
+    _REGION: us-central1
+    _ENGINE_URL: https://cscratch-171510694317.us-central1.run.app
+
+images:
+  - 'gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA'
