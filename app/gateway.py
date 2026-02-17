@@ -24,8 +24,10 @@ class GatewayBot(commands.Bot):
     async def setup_hook(self):
         self.http_session = aiohttp.ClientSession()
         
-        # Add Commands
+        # Add Command Groups/Trees
         self.tree.add_command(cscratch_group)
+        self.tree.add_command(admin_group)
+        self.tree.add_command(balance_cmd)
         self.tree.add_command(version_cmd)
         
         logger.info("Gateway: Syncing commands...")
@@ -66,17 +68,61 @@ class GatewayBot(commands.Bot):
 
 client = GatewayBot()
 
-# --- FORWARDING LOGIC ---
+# --- HELPER: PROXY ---
+
+async def proxy_command(interaction: discord.Interaction, command_name: str, **kwargs):
+    """
+    Generic forwarder for Slash Commands.
+    Packs arguments into 'params' and context into 'context'.
+    """
+    # 1. Defer Hidden (Ephemeral)
+    # We defer immediately to prevent the "Interaction Failed" UI state
+    if not interaction.response.is_done():
+        await interaction.response.defer(ephemeral=True)
+
+    # 2. Build Payload
+    # This structure must match the updated CommandPayload in the Engine
+    payload = {
+        "command": command_name,
+        "context": {
+            "guild_id": str(interaction.guild.id) if interaction.guild else None,
+            "channel_id": str(interaction.channel_id),
+            "user_id": str(interaction.user.id),
+            "user_name": interaction.user.name,
+        },
+        "params": {}
+    }
+
+    # 3. Serialize Params
+    # Convert Discord Objects (User, Member, Channel) to IDs stringified
+    for k, v in kwargs.items():
+        if isinstance(v, (discord.User, discord.Member)):
+            payload["params"][k] = str(v.id)
+        else:
+            payload["params"][k] = v
+
+    # 4. Forward
+    await client.forward_event("command", payload)
+
+    # 5. Cleanup UI
+    # We delete the "Thinking..." state since the Engine is expected to
+    # reply via a new message or webhook in the channel.
+    try:
+        await interaction.delete_original_response()
+    except:
+        pass
+
+# --- FORWARDING LOGIC (EVENTS) ---
 
 @client.event
 async def on_message(message):
     if message.author.bot:
         return
 
-    # 1. VISUAL FEEDBACK: Typing Indicator
     await message.channel.typing()
 
-    # 2. CONSTRUCT PAYLOAD
+    # Legacy flat payload for messages (keeping compatible with existing ingress logic for now)
+    # If you want to update this to match 'context' structure, update ingress MessagePayload too.
     payload = {
         "guild_id": str(message.guild.id) if message.guild else None,
         "channel_id": str(message.channel.id),
@@ -86,14 +132,12 @@ async def on_message(message):
         "message_id": str(message.id)
     }
 
-    # 3. FORWARD
     await client.forward_event("message", payload)
 
 @client.event
 async def on_interaction(interaction: discord.Interaction):
     # Handle Buttons/Dropdowns (Persistent Views)
     if interaction.type == discord.InteractionType.component:
-        # 1. DEFER IMMEDIATELY (Prevents "Interaction Failed")
         await interaction.response.defer()
         
         payload = {
@@ -103,52 +147,32 @@ async def on_interaction(interaction: discord.Interaction):
             "channel_id": str(interaction.channel_id),
             "user_id": str(interaction.user.id),
             "user_name": interaction.user.name,
-            "values": interaction.data.get("values", []) # For dropdowns
+            "values": interaction.data.get("values", [])
         }
         
         await client.forward_event("interaction", payload)
 
-# --- COMMAND PROXIES ---
+# --- COMMAND DEFINITIONS ---
 
+# 1. cscratch group (Existing)
 cscratch_group = app_commands.Group(name="cscratch", description="Manage cscratch games")
 
 @cscratch_group.command(name="start", description="Start a new game")
 async def start(interaction: discord.Interaction, cartridge: str = "foster-protocol"):
-    # 1. DEFER HIDDEN (ephemeral=True)
-    await interaction.response.defer(ephemeral=True)
-    
-    # 2. FORWARD
-    payload = {
-        "command": "start",
-        "cartridge": cartridge,
-        "guild_id": str(interaction.guild.id),
-        "channel_id": str(interaction.channel_id),
-        "user_id": str(interaction.user.id),
-        "user_name": interaction.user.name
-    }
-    await client.forward_event("command", payload)
-
-    # 3. SILENT CLEANUP
-    await interaction.delete_original_response()
+    await proxy_command(interaction, "start", cartridge=cartridge)
 
 @cscratch_group.command(name="end", description="Clean up the current game")
 async def end(interaction: discord.Interaction):
-    # 1. DEFER HIDDEN
-    await interaction.response.defer(ephemeral=True)
+    await proxy_command(interaction, "end")
 
-    # 2. FORWARD
-    payload = {
-        "command": "end",
-        "guild_id": str(interaction.guild.id),
-        "channel_id": str(interaction.channel_id),
-        "user_id": str(interaction.user.id),
-        "user_name": interaction.user.name
-    }
-    await client.forward_event("command", payload)
+@cscratch_group.command(name="balance", description="Check your scratch balance")
+async def balance_cmd(interaction: discord.Interaction):
+    await proxy_command(interaction, "balance")
 
-    # 3. SILENT CLEANUP
-    await interaction.delete_original_response()
+# 2. Admin Group (New)
+admin_group = app_commands.Group(name="admin", description="Admin tools")
 
-@app_commands.command(name="version", description="Check Gateway Version")
-async def version_cmd(interaction: discord.Interaction):
-    await interaction.response.send_message("Gateway: v1.0.0 (Proxy Mode)", ephemeral=True)
+@admin_group.command(name="gift", description="Gift tokens to a user")
+@app_commands.describe(amount="Amount to gift", recipient="Who gets it?")
+async def gift(interaction: discord.Interaction, amount: int, recipient: discord.User):
+    await proxy_command(interaction, "admin.gift", amount=amount, recipient=recipient)
