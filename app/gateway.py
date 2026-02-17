@@ -74,8 +74,6 @@ async def on_message(message):
         return
 
     # 1. VISUAL FEEDBACK: Typing Indicator
-    # We trigger this immediately so the user knows "System Heard You"
-    # while the engine spins up (cold start).
     await message.channel.typing()
 
     # 2. CONSTRUCT PAYLOAD
@@ -110,22 +108,14 @@ async def on_interaction(interaction: discord.Interaction):
         
         await client.forward_event("interaction", payload)
 
-        # 3. FINISH (Stop the button spinner)
-        try:
-            await interaction.followup.send("Processing Request", ephemeral=True)
-        except Exception as e:
-            logger.error(f"Failed to finish interaction: {e}")
-
 # --- COMMAND PROXIES ---
-# We must replicate the Command Tree here so Discord knows these commands exist.
-# The implementation is just "Defer -> Forward -> Ack".
 
 cscratch_group = app_commands.Group(name="cscratch", description="Manage cscratch games")
 
 @cscratch_group.command(name="start", description="Initialize a new game cartridge")
 async def start(interaction: discord.Interaction, cartridge: str = "foster-protocol"):
-    # 1. DEFER
-    await interaction.response.defer()
+    # 1. DEFER HIDDEN (ephemeral=True)
+    await interaction.response.defer(ephemeral=True)
     
     # 2. FORWARD
     payload = {
@@ -138,13 +128,13 @@ async def start(interaction: discord.Interaction, cartridge: str = "foster-proto
     }
     await client.forward_event("command", payload)
 
-    # 3. FINISH (Stop "Thinking...")
-    await interaction.followup.send(f"Processing lobby request", ephemeral=True)
+    # 3. SILENT CLEANUP
+    await interaction.delete_original_response()
 
 @cscratch_group.command(name="end", description="Terminate the current game session")
 async def end(interaction: discord.Interaction):
-    # 1. DEFER
-    await interaction.response.defer()
+    # 1. DEFER HIDDEN
+    await interaction.response.defer(ephemeral=True)
 
     # 2. FORWARD
     payload = {
@@ -156,10 +146,9 @@ async def end(interaction: discord.Interaction):
     }
     await client.forward_event("command", payload)
 
-    # 3. FINISH (Stop "Thinking...")
-    await interaction.followup.send("Procesing cleanup request", ephemeral=True)
+    # 3. SILENT CLEANUP
+    await interaction.delete_original_response()
 
 @app_commands.command(name="version", description="Check Gateway Version")
 async def version_cmd(interaction: discord.Interaction):
-    # This one we can answer locally!
-    await interaction.response.send_message("Gateway: v1.0.0 (Proxy Mode)")
+    await interaction.response.send_message("Gateway: v1.0.0 (Proxy Mode)", ephemeral=True)
