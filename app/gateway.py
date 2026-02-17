@@ -110,9 +110,15 @@ async def on_interaction(interaction: discord.Interaction):
         
         await client.forward_event("interaction", payload)
 
+        # 3. FINISH (Stop the button spinner)
+        try:
+            await interaction.followup.send("Processing Request", ephemeral=True)
+        except Exception as e:
+            logger.error(f"Failed to finish interaction: {e}")
+
 # --- COMMAND PROXIES ---
 # We must replicate the Command Tree here so Discord knows these commands exist.
-# The implementation is just "Defer -> Forward".
+# The implementation is just "Defer -> Forward -> Ack".
 
 cscratch_group = app_commands.Group(name="cscratch", description="Manage cscratch games")
 
@@ -132,6 +138,9 @@ async def start(interaction: discord.Interaction, cartridge: str = "foster-proto
     }
     await client.forward_event("command", payload)
 
+    # 3. FINISH (Stop "Thinking...")
+    await interaction.followup.send(f"Processing lobby request", ephemeral=True)
+
 @cscratch_group.command(name="end", description="Terminate the current game session")
 async def end(interaction: discord.Interaction):
     # 1. DEFER
@@ -146,6 +155,9 @@ async def end(interaction: discord.Interaction):
         "user_name": interaction.user.name
     }
     await client.forward_event("command", payload)
+
+    # 3. FINISH (Stop "Thinking...")
+    await interaction.followup.send("Procesing cleanup request", ephemeral=True)
 
 @app_commands.command(name="version", description="Check Gateway Version")
 async def version_cmd(interaction: discord.Interaction):
