@@ -112,7 +112,7 @@ async def on_interaction(interaction: discord.Interaction):
 
 cscratch_group = app_commands.Group(name="cscratch", description="Manage cscratch games")
 
-@cscratch_group.command(name="start", description="Initialize a new game cartridge")
+@cscratch_group.command(name="start", description="Start a new game")
 async def start(interaction: discord.Interaction, cartridge: str = "foster-protocol"):
     # 1. DEFER HIDDEN (ephemeral=True)
     await interaction.response.defer(ephemeral=True)
@@ -131,7 +131,7 @@ async def start(interaction: discord.Interaction, cartridge: str = "foster-proto
     # 3. SILENT CLEANUP
     await interaction.delete_original_response()
 
-@cscratch_group.command(name="end", description="Terminate the current game session")
+@cscratch_group.command(name="end", description="Clean up the current game")
 async def end(interaction: discord.Interaction):
     # 1. DEFER HIDDEN
     await interaction.response.defer(ephemeral=True)
