@@ -27,8 +27,6 @@ class GatewayBot(commands.Bot):
         # Add Command Groups/Trees
         self.tree.add_command(cscratch_group)
         self.tree.add_command(admin_group)
-        self.tree.add_command(balance_cmd)
-        self.tree.add_command(version_cmd)
         
         logger.info("Gateway: Syncing commands...")
         await self.tree.sync()
