@@ -145,6 +145,7 @@ async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
         
         custom_id = interaction.data.get("custom_id")
+        # start_btn is ephemeral (only host sees status), join_btn is public
         is_ephemeral = (custom_id == "start_btn")
         
         # 1. Defer
@@ -171,15 +172,6 @@ async def on_interaction(interaction: discord.Interaction):
         }
         
         await client.forward_event("interaction", payload)
-
-        # 3. Cleanup Public Interactions (like Join Button)
-        # If we don't delete this, the button will spin "Thinking..." forever
-        # because the Engine sends a *new* message instead of replying to this interaction.
-        if not is_ephemeral:
-            try:
-                await interaction.delete_original_response()
-            except:
-                pass
 
 # --- COMMAND DEFINITIONS ---
 
