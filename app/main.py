@@ -1,53 +1,38 @@
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
 import asyncio
 import logging
-from contextlib import asynccontextmanager
-import nest_asyncio
-from fastapi import FastAPI, Response, status
+import os
 
 from . import gateway
 from . import config
 
-nest_asyncio.apply()
+# Logging
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- STARTUP ---
+    # STARTUP
+    logger.info("Starting Gateway Bot...")
+    if not config.DISCORD_TOKEN:
+        logger.error("FATAL: DISCORD_TOKEN is missing!")
+        
+    # Start the bot in the background
     asyncio.create_task(gateway.client.start(config.DISCORD_TOKEN))
     
     yield
     
-    # --- SHUTDOWN ---
-    logging.info("Gateway: Shutting down...")
+    # SHUTDOWN
+    logger.info("Stopping Gateway Bot...")
     await gateway.client.close()
 
 app = FastAPI(lifespan=lifespan)
 
 @app.get("/ping")
-async def ping(response: Response):
-    """
-    Health check for Cloud Run.
-    Also reports if the Discord Socket is actually connected.
-    """
-    is_connected = gateway.client.is_ready() and not gateway.client.is_closed()
-    
-    if is_connected:
-        return {
-            "status": "ok", 
-            "service": "cscratch-dg",
-            "discord": "connected"
-        }
-    
-    # If Discord isn't ready, we return 200 (so Cloud Run doesn't kill the container)
-    # but we log the status as initializing or disconnected.
-    # Note: Returning 500 here might cause Cloud Run to restart the container repeatedly
-    # during a slow startup, so we stick to 200 with status detail.
-    return {
-        "status": "initializing", 
-        "service": "cscratch-dg",
-        "discord": "disconnected"
-    }
+async def ping():
+    return {"status": "ok", "bot_connected": gateway.client.is_ready()}
 
-@app.get("/")
-async def root():
-    return {"msg": "cscratch Gateway Proxy Online"}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8080)

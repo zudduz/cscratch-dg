@@ -71,15 +71,19 @@ client = GatewayBot()
 async def proxy_command(interaction: discord.Interaction, command_name: str, ephemeral: bool = False, **kwargs):
     """
     Generic forwarder for Slash Commands.
-    Packs arguments into 'params' and context into 'context'.
     """
-    # 1. Defer (Ephemeral or Public)
-    # We defer immediately to prevent the "Interaction Failed" UI state
-    if not interaction.response.is_done():
-        await interaction.response.defer(ephemeral=ephemeral)
+    # 1. Defer (Ephemeral or Public) with Error Handling
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.defer(ephemeral=ephemeral)
+    except discord.NotFound:
+        logger.warning(f"Cmd {command_name}: Interaction timed out before defer (Gateway Lag)")
+        return
+    except Exception as e:
+        logger.error(f"Cmd {command_name}: Defer failed: {e}")
+        return
 
     # 2. Build Payload
-    # This structure must match the updated CommandPayload in the Engine
     payload = {
         "command": command_name,
         "context": {
@@ -94,7 +98,6 @@ async def proxy_command(interaction: discord.Interaction, command_name: str, eph
     }
 
     # 3. Serialize Params
-    # Convert Discord Objects (User, Member, Channel) to IDs stringified
     for k, v in kwargs.items():
         if isinstance(v, (discord.User, discord.Member)):
             payload["params"][k] = str(v.id)
@@ -105,9 +108,8 @@ async def proxy_command(interaction: discord.Interaction, command_name: str, eph
     await client.forward_event("command", payload)
 
     # 5. Cleanup UI
-    # If it was ephemeral, we CANNOT delete the original response easily 
-    # without dismissing the "Thinking..." state for the user. 
-    # The Engine is expected to Edit Original or Send Followup.
+    # We clean up public responses so the "Thinking..." state goes away.
+    # Ephemeral states cannot be deleted easily, relying on Engine to followup.
     if not ephemeral:
         try:
             await interaction.delete_original_response()
@@ -121,7 +123,9 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    await message.channel.typing()
+    # Don't trigger typing/forwarding for empty messages (system msgs)
+    if not message.content:
+        return
 
     # Legacy flat payload for messages
     payload = {
@@ -141,11 +145,19 @@ async def on_interaction(interaction: discord.Interaction):
     if interaction.type == discord.InteractionType.component:
         
         custom_id = interaction.data.get("custom_id")
-        
-        # Defer logic: Start button is now private/ephemeral
         is_ephemeral = (custom_id == "start_btn")
-        await interaction.response.defer(ephemeral=is_ephemeral)
         
+        # 1. Defer
+        try:
+            await interaction.response.defer(ephemeral=is_ephemeral)
+        except discord.NotFound:
+            logger.warning(f"Interaction {custom_id}: Timed out before defer")
+            return
+        except Exception as e:
+            logger.error(f"Interaction {custom_id}: Error {e}")
+            return
+        
+        # 2. Forward
         payload = {
             "type": "component",
             "custom_id": custom_id,
@@ -159,6 +171,15 @@ async def on_interaction(interaction: discord.Interaction):
         }
         
         await client.forward_event("interaction", payload)
+
+        # 3. Cleanup Public Interactions (like Join Button)
+        # If we don't delete this, the button will spin "Thinking..." forever
+        # because the Engine sends a *new* message instead of replying to this interaction.
+        if not is_ephemeral:
+            try:
+                await interaction.delete_original_response()
+            except:
+                pass
 
 # --- COMMAND DEFINITIONS ---
 
