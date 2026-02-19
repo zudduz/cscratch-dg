@@ -174,3 +174,8 @@ admin_group = app_commands.Group(name="admin", description="Admin tools")
 @app_commands.describe(amount="Amount to gift", recipient="Who gets it?")
 async def gift(interaction: discord.Interaction, amount: int, recipient: discord.User):
     await proxy_command(interaction, "admin.gift", amount=amount, recipient=recipient)
+
+@admin_group.command(name="balance", description="Check a user's balance")
+@app_commands.describe(user="The user to check")
+async def check_balance(interaction: discord.Interaction, user: discord.User):
+    await proxy_command(interaction, "admin.balance", user=user)
