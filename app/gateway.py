@@ -68,15 +68,15 @@ client = GatewayBot()
 
 # --- HELPER: PROXY ---
 
-async def proxy_command(interaction: discord.Interaction, command_name: str, **kwargs):
+async def proxy_command(interaction: discord.Interaction, command_name: str, ephemeral: bool = False, **kwargs):
     """
     Generic forwarder for Slash Commands.
     Packs arguments into 'params' and context into 'context'.
     """
-    # 1. Defer Hidden (Ephemeral)
+    # 1. Defer (Ephemeral or Public)
     # We defer immediately to prevent the "Interaction Failed" UI state
     if not interaction.response.is_done():
-        await interaction.response.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=ephemeral)
 
     # 2. Build Payload
     # This structure must match the updated CommandPayload in the Engine
@@ -87,6 +87,8 @@ async def proxy_command(interaction: discord.Interaction, command_name: str, **k
             "channel_id": str(interaction.channel_id),
             "user_id": str(interaction.user.id),
             "user_name": interaction.user.name,
+            "interaction_token": interaction.token,
+            "application_id": str(interaction.application_id)
         },
         "params": {}
     }
@@ -103,12 +105,14 @@ async def proxy_command(interaction: discord.Interaction, command_name: str, **k
     await client.forward_event("command", payload)
 
     # 5. Cleanup UI
-    # We delete the "Thinking..." state since the Engine is expected to
-    # reply via a new message or webhook in the channel.
-    try:
-        await interaction.delete_original_response()
-    except:
-        pass
+    # If it was ephemeral, we CANNOT delete the original response easily 
+    # without dismissing the "Thinking..." state for the user. 
+    # The Engine is expected to Edit Original or Send Followup.
+    if not ephemeral:
+        try:
+            await interaction.delete_original_response()
+        except:
+            pass
 
 # --- FORWARDING LOGIC (EVENTS) ---
 
@@ -119,8 +123,7 @@ async def on_message(message):
 
     await message.channel.typing()
 
-    # Legacy flat payload for messages (keeping compatible with existing ingress logic for now)
-    # If you want to update this to match 'context' structure, update ingress MessagePayload too.
+    # Legacy flat payload for messages
     payload = {
         "guild_id": str(message.guild.id) if message.guild else None,
         "channel_id": str(message.channel.id),
@@ -136,16 +139,23 @@ async def on_message(message):
 async def on_interaction(interaction: discord.Interaction):
     # Handle Buttons/Dropdowns (Persistent Views)
     if interaction.type == discord.InteractionType.component:
-        await interaction.response.defer()
+        
+        custom_id = interaction.data.get("custom_id")
+        
+        # Defer logic: Start button is now private/ephemeral
+        is_ephemeral = (custom_id == "start_btn")
+        await interaction.response.defer(ephemeral=is_ephemeral)
         
         payload = {
             "type": "component",
-            "custom_id": interaction.data.get("custom_id"),
+            "custom_id": custom_id,
             "guild_id": str(interaction.guild.id) if interaction.guild else None,
             "channel_id": str(interaction.channel_id),
             "user_id": str(interaction.user.id),
             "user_name": interaction.user.name,
-            "values": interaction.data.get("values", [])
+            "values": interaction.data.get("values", []),
+            "interaction_token": interaction.token,
+            "application_id": str(interaction.application_id)
         }
         
         await client.forward_event("interaction", payload)
@@ -163,9 +173,9 @@ async def start(interaction: discord.Interaction, cartridge: str = "foster-proto
 async def end(interaction: discord.Interaction):
     await proxy_command(interaction, "end")
 
-@cscratch_group.command(name="balance", description="Check your scratch balance")
+@cscratch_group.command(name="balance", description="Check your scratch balance (Private)")
 async def balance_cmd(interaction: discord.Interaction):
-    await proxy_command(interaction, "balance")
+    await proxy_command(interaction, "balance", ephemeral=True)
 
 # 2. Admin Group (New)
 admin_group = app_commands.Group(name="admin", description="Admin tools")
