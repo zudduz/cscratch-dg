@@ -190,6 +190,14 @@ async def end(interaction: discord.Interaction):
 async def balance_cmd(interaction: discord.Interaction):
     await proxy_command(interaction, "balance", ephemeral=True)
 
+@cscratch_group.command(name="guide", description="Read a getting started guide")
+async def balance_cmd(interaction: discord.Interaction):
+    await proxy_command(interaction, "guide")
+
+@cscratch_group.command(name="manual", description="Read a manual covering all game mechanics")
+async def balance_cmd(interaction: discord.Interaction):
+    await proxy_command(interaction, "manual")
+
 # # 2. Admin Group (New)
 # admin_group = app_commands.Group(name="admin", description="Admin tools")
 
