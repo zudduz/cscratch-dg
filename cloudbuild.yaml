@@ -19,8 +19,9 @@ steps:
       - '--region'
       - '$_REGION'
       - '--allow-unauthenticated'
-      - '--min-instances=0'
+      - '--min-instances=1'
       - '--max-instances=1'
+      - '--no-cpu-throttling'      # Added to keep the Discord websocket running
       - '--set-env-vars'
       - 'ENGINE_URL=$_ENGINE_URL,GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
       - '--set-secrets'
