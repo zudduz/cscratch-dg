@@ -37,7 +37,6 @@ class GatewayBot(commands.Bot):
         
         # Add Command Groups/Trees
         self.tree.add_command(cscratch_group)
-        self.tree.add_command(admin_group)
         
         logger.info("Gateway: Syncing commands...")
         await self.tree.sync()
@@ -68,12 +67,23 @@ class GatewayBot(commands.Bot):
 
     async def _post_to_engine(self, event_type: str, payload: dict, headers: dict):
         url = f"{config.ENGINE_URL}/ingress/{event_type}"
-        try:
-            async with self.http_session.post(url, json=payload, headers=headers) as resp:
-                if resp.status >= 400:
-                    logger.error(f"Engine Error {resp.status}: {await resp.text()}")
-        except Exception as e:
-            logger.error(f"Failed to forward to Engine: {e}")
+        max_retries = 3
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with self.http_session.post(url, json=payload, headers=headers) as resp:
+                    if resp.status >= 400:
+                        logger.error(f"Engine Error {resp.status}: {await resp.text()}")
+                    return # Exit on successful request or valid HTTP response
+            except aiohttp.ClientError as e:
+                logger.warning(f"Network hiccup to Engine (attempt {attempt}/{max_retries}): {e}")
+                if attempt == max_retries:
+                    logger.error(f"Failed to forward {event_type} to Engine after {max_retries} attempts.")
+                else:
+                    await asyncio.sleep(2 ** attempt) # Exponential backoff: 2s, 4s, 8s
+            except Exception as e:
+                logger.error(f"Unexpected error forwarding to Engine: {e}")
+                return
 
 client = GatewayBot()
 
@@ -118,15 +128,6 @@ async def proxy_command(interaction: discord.Interaction, command_name: str, eph
     # 4. Forward
     await client.forward_event("command", payload)
 
-    # 5. Cleanup UI
-    # We clean up public responses so the "Thinking..." state goes away.
-    # Ephemeral states cannot be deleted easily, relying on Engine to followup.
-    if not ephemeral:
-        try:
-            await interaction.delete_original_response()
-        except:
-            pass
-
 # --- FORWARDING LOGIC (EVENTS) ---
 
 @client.event
@@ -134,11 +135,9 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    # Don't trigger typing/forwarding for empty messages (system msgs)
     if not message.content:
         return
 
-    # Legacy flat payload for messages
     payload = {
         "guild_id": str(message.guild.id) if message.guild else None,
         "channel_id": str(message.channel.id),
@@ -152,14 +151,11 @@ async def on_message(message):
 
 @client.event
 async def on_interaction(interaction: discord.Interaction):
-    # Handle Buttons/Dropdowns (Persistent Views)
     if interaction.type == discord.InteractionType.component:
         
         custom_id = interaction.data.get("custom_id")
-        # start_btn is ephemeral (only host sees status), join_btn is public
         is_ephemeral = (custom_id == "start_btn")
         
-        # 1. Defer
         try:
             await interaction.response.defer(ephemeral=is_ephemeral)
         except discord.NotFound:
@@ -169,7 +165,6 @@ async def on_interaction(interaction: discord.Interaction):
             logger.error(f"Interaction {custom_id}: Error {e}")
             return
         
-        # 2. Forward
         payload = {
             "type": "component",
             "custom_id": custom_id,
@@ -186,7 +181,6 @@ async def on_interaction(interaction: discord.Interaction):
 
 # --- COMMAND DEFINITIONS ---
 
-# 1. cscratch group (Existing)
 cscratch_group = app_commands.Group(name="cscratch", description="Manage cscratch games")
 
 @cscratch_group.command(name="start", description="Start a new game")
@@ -202,22 +196,9 @@ async def balance_cmd(interaction: discord.Interaction):
     await proxy_command(interaction, "balance", ephemeral=True)
 
 @cscratch_group.command(name="guide", description="Read a getting started guide")
-async def guid_cmd(interaction: discord.Interaction):
+async def guide_cmd(interaction: discord.Interaction):
     await proxy_command(interaction, "guide")
 
 @cscratch_group.command(name="manual", description="Read a manual covering all game mechanics")
 async def manual_cmd(interaction: discord.Interaction):
     await proxy_command(interaction, "manual")
-
-# # 2. Admin Group (New)
-# admin_group = app_commands.Group(name="admin", description="Admin tools")
-
-# @admin_group.command(name="gift", description="Gift tokens to a user")
-# @app_commands.describe(amount="Amount to gift", recipient="Who gets it?")
-# async def gift(interaction: discord.Interaction, amount: int, recipient: discord.User):
-#     await proxy_command(interaction, "admin.gift", amount=amount, recipient=recipient)
-
-# @admin_group.command(name="balance", description="Check a user's balance")
-# @app_commands.describe(user="The user to check")
-# async def check_balance(interaction: discord.Interaction, user: discord.User):
-#     await proxy_command(interaction, "admin.balance", user=user)

@@ -18,8 +18,19 @@ async def lifespan(app: FastAPI):
     if not config.DISCORD_TOKEN:
         logger.error("FATAL: DISCORD_TOKEN is missing!")
         
-    # Start the bot in the background
-    asyncio.create_task(gateway.client.start(config.DISCORD_TOKEN))
+    async def run_bot():
+        try:
+            await gateway.client.start(config.DISCORD_TOKEN)
+        except Exception as e:
+            logger.critical(f"Discord gateway connection failed: {e}")
+        finally:
+            # If the bot task exits for any reason, kill the container.
+            # Cloud Run will automatically restart it.
+            logger.critical("Bot task ended unexpectedly. Forcing container exit.")
+            os._exit(1)
+            
+    # Start the bot in the background with crash handling
+    asyncio.create_task(run_bot())
     
     yield
     
