@@ -23,16 +23,6 @@ class GatewayBot(commands.Bot):
 
     async def setup_hook(self):
 
-        # TODO Delete this block
-        guild = discord.Object(id=1473981308341583884)
-        self.tree.clear_commands(guild=guild)
-        await self.tree.sync(guild=guild)
-
-        # TODO Delete this block
-        guild = discord.Object(id=1455418686931468403)
-        self.tree.clear_commands(guild=guild)
-        await self.tree.sync(guild=guild)
-
         self.http_session = aiohttp.ClientSession()
         
         # Add Command Groups/Trees
