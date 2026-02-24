@@ -22,6 +22,17 @@ class GatewayBot(commands.Bot):
         self.http_session = None
 
     async def setup_hook(self):
+
+        # TODO Delete this block
+        guild = discord.Object(id=1473981308341583884)
+        self.tree.clear_commands(guild=guild)
+        await self.tree.sync(guild=guild)
+
+        # TODO Delete this block
+        guild = discord.Object(id=1455418686931468403)
+        self.tree.clear_commands(guild=guild)
+        await self.tree.sync(guild=guild)
+
         self.http_session = aiohttp.ClientSession()
         
         # Add Command Groups/Trees
@@ -191,11 +202,11 @@ async def balance_cmd(interaction: discord.Interaction):
     await proxy_command(interaction, "balance", ephemeral=True)
 
 @cscratch_group.command(name="guide", description="Read a getting started guide")
-async def balance_cmd(interaction: discord.Interaction):
+async def guid_cmd(interaction: discord.Interaction):
     await proxy_command(interaction, "guide")
 
 @cscratch_group.command(name="manual", description="Read a manual covering all game mechanics")
-async def balance_cmd(interaction: discord.Interaction):
+async def manual_cmd(interaction: discord.Interaction):
     await proxy_command(interaction, "manual")
 
 # # 2. Admin Group (New)
