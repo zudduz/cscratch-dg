@@ -177,6 +177,10 @@ cscratch_group = app_commands.Group(name="cscratch", description="Manage cscratc
 async def start(interaction: discord.Interaction, cartridge: str = "foster-protocol"):
     await proxy_command(interaction, "start", cartridge=cartridge)
 
+@cscratch_group.command(name="lobby", description="Convert this channel into a game lobby")
+async def lobby(interaction: discord.Interaction, cartridge: str = "foster-protocol"):
+    await proxy_command(interaction, "lobby", cartridge=cartridge)
+
 @cscratch_group.command(name="end", description="Clean up the current game")
 async def end(interaction: discord.Interaction):
     await proxy_command(interaction, "end")
