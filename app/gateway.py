@@ -173,17 +173,13 @@ async def on_interaction(interaction: discord.Interaction):
 
 cscratch_group = app_commands.Group(name="cscratch", description="Manage cscratch games")
 
-@cscratch_group.command(name="start", description="Start a new game")
-async def start(interaction: discord.Interaction, cartridge: str = "foster-protocol"):
-    await proxy_command(interaction, "start", cartridge=cartridge)
-
-@cscratch_group.command(name="lobby", description="Convert this channel into a game lobby")
+@cscratch_group.command(name="lobby", description="Create a game lobby")
 async def lobby(interaction: discord.Interaction, cartridge: str = "foster-protocol"):
     await proxy_command(interaction, "lobby", cartridge=cartridge)
 
-@cscratch_group.command(name="end", description="Clean up the current game")
-async def end(interaction: discord.Interaction):
-    await proxy_command(interaction, "end")
+@cscratch_group.command(name="kill", description="End and delete the current game")
+async def kill(interaction: discord.Interaction):
+    await proxy_command(interaction, "kill")
 
 @cscratch_group.command(name="balance", description="Check your scratch balance (Private)")
 async def balance_cmd(interaction: discord.Interaction):
