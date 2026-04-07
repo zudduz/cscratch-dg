@@ -2,7 +2,6 @@ import discord
 import logging
 import aiohttp
 import asyncio
-import json
 from discord import app_commands
 from discord.ext import commands
 from . import config
