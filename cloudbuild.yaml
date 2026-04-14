@@ -29,10 +29,10 @@ steps:
 
 substitutions:
     # Use '0' or '1' to control minimum instances.
-    _MIN_INSTANCES: '0'
+    _MIN_INSTANCES: '1'
     # Use '--no-cpu-throttling' to keep the Discord websocket running.
     # Use '--cpu-throttling' for standard behavior.
-    _THROTTLE_FLAG: '--cpu-throttling'
+    _THROTTLE_FLAG: '--no-cpu-throttling'
     _SERVICE_NAME: cscratch-dg
     _REGION: us-central1
     _ENGINE_URL: https://cscratch-171510694317.us-central1.run.app
