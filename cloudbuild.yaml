@@ -28,8 +28,7 @@ steps:
       - 'INTERNAL_API_KEY=cscratch-internal-api-key:latest,DISCORD_TOKEN=cscratch-discord-token:latest'
 
 substitutions:
-    # Use '0' or '1' to control minimum instances.
-    _MIN_INSTANCES: '1'
+    _MIN_INSTANCES: '0'
     _SERVICE_NAME: cscratch-dg
     _REGION: us-central1
     _ENGINE_URL: https://cscratch-171510694317.us-central1.run.app
